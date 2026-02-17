@@ -71,6 +71,7 @@ function sanitizeText(text) {
  * @param {string} emailData.from - Email sender
  * @param {string} emailData.subject - Email subject
  * @param {string} emailData.threadId - Gmail thread ID
+ * @param {string} emailData.messageId - Email Message-ID header (for reply support)
  * @param {string} emailData.body - Email body text
  * @param {Array<string>} emailData.attachments - Array of attachment filenames
  */
@@ -87,6 +88,7 @@ export async function logEmailToCSV(emailData) {
                 { id: 'from', title: 'from' },
                 { id: 'subject', title: 'subject' },
                 { id: 'threadId', title: 'threadId' },
+                { id: 'messageId', title: 'messageId' }, // ✅ Added for email reply support
                 { id: 'body', title: 'body' },
                 { id: 'attachments', title: 'attachments' }
             ],
@@ -104,6 +106,7 @@ export async function logEmailToCSV(emailData) {
             from: sanitizeText(emailData.from) || '',
             subject: sanitizeText(emailData.subject) || '',
             threadId: emailData.threadId || '',
+            messageId: emailData.messageId || '', // ✅ Store messageId with angle brackets for reply support
             body: sanitizeText(emailData.body), // Sanitize body text
             attachments: attachmentsString
         };

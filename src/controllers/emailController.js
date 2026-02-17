@@ -41,9 +41,9 @@ export async function checkEmails(req, res) {
 
 export async function sendEmailController(req, res) {
     try {
-        const { to, subject, text } = req.body;
+        const { to, subject, text, inReplyTo } = req.body;
         // Send email via service
-        const result = await sendEmail({ to, subject, text });
+        const result = await sendEmail({ to, subject, text, inReplyTo });
 
         if (result.success) {
             return res.status(200).json({

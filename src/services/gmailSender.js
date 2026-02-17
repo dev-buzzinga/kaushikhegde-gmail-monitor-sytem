@@ -26,7 +26,7 @@ function createTransporter() {
  * @param {string} emailOptions.text - Email body (plain text)
  * @returns {Promise<Object>} - Send result with success status and message
  */
-export async function sendEmail({ to, subject, text }) {
+export async function sendEmail({ to, subject, text, inReplyTo }) {
     try {
         // Validate required fields
         if (!to || !subject || !text) {
@@ -43,9 +43,13 @@ export async function sendEmail({ to, subject, text }) {
             from: config.EMAIL_USER,
             to,
             subject,
-            text
+            text,
+            headers: {}
         };
-
+        if (inReplyTo) {
+            mailOptions.headers['In-Reply-To'] = inReplyTo;
+            mailOptions.headers['References'] = inReplyTo;
+        }
         console.log(`📧 Sending email to: ${to}`);
         const info = await transporter.sendMail(mailOptions);
 

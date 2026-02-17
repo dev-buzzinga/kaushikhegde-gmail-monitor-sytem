@@ -87,6 +87,9 @@ async function processEmail(message) {
         // Extract thread ID
         const threadId = extractThreadId(parsed.headers);
 
+        // ✅ PART 1: Extract Message-ID header for email reply support
+        const messageId = parsed.headers.get('message-id') || '';
+
         // Extract plain text body
         let body = '';
         if (parsed.text) {
@@ -115,6 +118,7 @@ async function processEmail(message) {
             from: parsed.from ? parsed.from.text : 'Unknown',
             subject: parsed.subject || 'No Subject',
             threadId: threadId,
+            messageId: messageId, // ✅ Added messageId for reply support
             body: body,
             attachments: savedAttachments
         };
