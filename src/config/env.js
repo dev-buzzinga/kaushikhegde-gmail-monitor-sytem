@@ -15,5 +15,9 @@ export const config = {
 
     // SMTP Configuration
     SMTP_HOST: process.env.SMTP_HOST || 'smtp.gmail.com',
-    SMTP_PORT: parseInt(process.env.SMTP_PORT) || 465
+    SMTP_PORT: parseInt(process.env.SMTP_PORT) || 465,
+
+    // AI Configuration
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    MAX_AI_ATTACHMENT_SIZE_MB: parseInt(process.env.MAX_AI_ATTACHMENT_SIZE_MB) || 2
 }

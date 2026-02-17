@@ -5,6 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from '../config/env.js';
 import { logEmailToCSV } from '../utils/csvLogger.js';
+import { classifyEmail, extractReferralData } from './aiService.js';
+import { logReferralToCSV } from '../utils/referralLogger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,12 +128,97 @@ async function processEmail(message) {
         // Log to CSV
         await logEmailToCSV(emailData);
 
+        // ✅ AI PROCESSING PIPELINE - Process potential dental referrals
+        await processReferralWithAI(emailData);
+
         return emailData;
 
     } catch (error) {
         console.error('❌ Error processing email:', error.message);
         throw error;
     }
+}
+
+/**
+ * AI Processing Pipeline for Dental Referral Detection
+ * Implements 5-step validation and extraction process
+ * 
+ * @param {Object} emailData - Processed email data
+ */
+async function processReferralWithAI(emailData) {
+    try {
+        console.log('\n🤖 Starting AI referral processing pipeline...');
+
+        // STEP 1: Check if email has attachments
+        if (!emailData.attachments || emailData.attachments.length === 0) {
+            console.log('⏭️  Step 1: No attachments found, skipping AI processing');
+            return;
+        }
+        console.log(`✅ Step 1: Found ${emailData.attachments.length} attachment(s)`);
+
+        // STEP 2: Classify email using AI (subject + body)
+        const isDentalReferral = await classifyEmail(emailData.subject, emailData.body);
+        if (!isDentalReferral) {
+            console.log('⏭️  Step 2: Email not classified as dental referral, skipping');
+            return;
+        }
+        console.log('✅ Step 2: Email classified as dental referral');
+
+        // STEP 3: Check attachment size limit
+        const totalSizeMB = calculateAttachmentSize(emailData.attachments);
+        const maxSizeMB = config.MAX_AI_ATTACHMENT_SIZE_MB;
+
+        if (totalSizeMB > maxSizeMB) {
+            console.log(`⏭️  Step 3: Attachments too large (${totalSizeMB.toFixed(2)}MB > ${maxSizeMB}MB), skipping AI processing`);
+            return;
+        }
+        console.log(`✅ Step 3: Attachment size OK (${totalSizeMB.toFixed(2)}MB <= ${maxSizeMB}MB)`);
+
+        // STEP 4: Send attachment to AI for document understanding
+        const extractedData = await extractReferralData(emailData.attachments, ATTACHMENTS_DIR);
+
+        if (!extractedData) {
+            console.log('⏭️  Step 4: No referral data extracted (not a referral form or extraction failed)');
+            return;
+        }
+        console.log('✅ Step 4: Referral data extracted successfully');
+
+        // STEP 5: Save to referrals.csv
+        await logReferralToCSV({
+            messageId: emailData.messageId,
+            threadId: emailData.threadId,
+            from: emailData.from,
+            extractedData: extractedData
+        });
+        console.log('✅ Step 5: Referral logged to CSV');
+
+        console.log('🎉 AI referral processing completed successfully!\n');
+
+    } catch (error) {
+        // Graceful failure - don't break email processing
+        console.error('⚠️  AI processing failed (non-critical):', error.message);
+        console.log('📧 Email processing will continue normally\n');
+    }
+}
+
+/**
+ * Calculates total size of attachments in MB
+ * @param {Array<string>} attachmentFilenames - Array of attachment filenames
+ * @returns {number} - Total size in MB
+ */
+function calculateAttachmentSize(attachmentFilenames) {
+    let totalBytes = 0;
+
+    for (const filename of attachmentFilenames) {
+        const filepath = path.join(ATTACHMENTS_DIR, filename);
+
+        if (fs.existsSync(filepath)) {
+            const stats = fs.statSync(filepath);
+            totalBytes += stats.size;
+        }
+    }
+
+    return totalBytes / (1024 * 1024); // Convert to MB
 }
 
 /**
