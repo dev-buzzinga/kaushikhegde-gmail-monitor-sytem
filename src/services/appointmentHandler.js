@@ -139,9 +139,12 @@ async function handleBookingConfirmation(emailData, doctorName) {
         console.log('⚠️  Could not check calendar:', calendarError.message);
     }
 
-    // 4. Try to match and book the first available requested slot
+    // 4. Try to match and book ALL available requested slots
     const senderName = extractSenderName(emailData.from);
     const senderEmail = extractSenderEmail(emailData.from);
+
+    const bookedSlots = [];
+    const failedSlots = [];
 
     for (const requested of requestedSlots) {
         const matchingSlot = findMatchingSlot(availableSlots, requested.day, requested.time);
@@ -156,34 +159,55 @@ async function handleBookingConfirmation(emailData, doctorName) {
                     endTime: matchingSlot.endTime,
                 });
 
-                // 6. Send confirmation email
-                const confirmationText =
-                    `Your appointment with ${doctorName} has been confirmed! ✅\n\n` +
-                    `📅 Date: ${matchingSlot.date}\n` +
-                    `🕐 Time: ${matchingSlot.label}\n\n` +
-                    `Please arrive 10 minutes before your appointment time.\n` +
-                    `If you need to cancel or reschedule, please reply to this email.\n\n` +
-                    `Thank you!`;
+                bookedSlots.push(matchingSlot);
+                console.log(`✅ Slot booked: ${matchingSlot.date} ${matchingSlot.label}`);
 
-                await sendReply(emailData, confirmationText);
-                console.log(`✅ Appointment booked successfully for ${senderName}`);
-                return;
+                // Remove booked slot from available slots so it can't be double-matched
+                availableSlots = availableSlots.filter(s =>
+                    s.startTime.getTime() !== matchingSlot.startTime.getTime()
+                );
 
             } catch (bookingError) {
-                console.error('❌ Error booking appointment:', bookingError.message);
+                console.error('❌ Error booking slot:', bookingError.message);
+                failedSlots.push(requested);
             }
+        } else {
+            failedSlots.push(requested);
         }
     }
 
-    // 7. No matching slot available — send apology
-    const apologyText =
-        `Thank you for your interest in booking with ${doctorName}.\n\n` +
-        `Unfortunately, the requested time slot(s) are not available this week.\n\n` +
-        `Here are the currently available slots:\n\n` +
-        formatAvailabilityTable(availableSlots, doctorName);
+    // 6. Send response based on booking results
+    if (bookedSlots.length > 0) {
+        const slotDetails = bookedSlots.map(slot =>
+            `📅 Date: ${slot.date}\n🕐 Time: ${slot.label}`
+        ).join('\n\n');
 
-    await sendReply(emailData, apologyText);
-    console.log('📧 Sent apology with alternative slots');
+        let confirmationText =
+            `Your appointment${bookedSlots.length > 1 ? 's' : ''} with ${doctorName} ${bookedSlots.length > 1 ? 'have' : 'has'} been confirmed! ✅\n\n` +
+            `${slotDetails}\n\n` +
+            `Please arrive 10 minutes before your appointment time.\n` +
+            `If you need to cancel or reschedule, please reply to this email.\n\n`;
+
+        if (failedSlots.length > 0) {
+            confirmationText += `⚠️ Note: ${failedSlots.length} requested slot(s) could not be booked as they were not available.\n\n`;
+        }
+
+        confirmationText += `Thank you!`;
+
+        await sendReply(emailData, confirmationText);
+        console.log(`✅ ${bookedSlots.length} appointment(s) booked successfully for ${senderName}`);
+
+    } else {
+        // 7. No matching slot available — send apology
+        const apologyText =
+            `Thank you for your interest in booking with ${doctorName}.\n\n` +
+            `Unfortunately, the requested time slot(s) are not available this week.\n\n` +
+            `Here are the currently available slots:\n\n` +
+            formatAvailabilityTable(availableSlots, doctorName);
+
+        await sendReply(emailData, apologyText);
+        console.log('📧 Sent apology with alternative slots');
+    }
 }
 
 /**
