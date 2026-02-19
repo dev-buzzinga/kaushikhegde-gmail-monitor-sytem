@@ -1,5 +1,5 @@
 import { config } from '../config/env.js';
-import { classifyAppointmentIntent, extractBookingSlots } from './appointmentClassifier.js';
+import { classifyAppointmentIntent, extractBookingSlots } from './aiService.js';
 import { readAvailability, generateSlots, removeBookedSlots, formatAvailabilityTable, findMatchingSlot } from './availabilityService.js';
 import { getEventsForDateRange, createEvent } from './calendarService.js';
 import { sendEmail } from './gmailSender.js';
@@ -185,8 +185,7 @@ async function handleBookingConfirmation(emailData, doctorName) {
         let confirmationText =
             `Your appointment${bookedSlots.length > 1 ? 's' : ''} with ${doctorName} ${bookedSlots.length > 1 ? 'have' : 'has'} been confirmed! ✅\n\n` +
             `${slotDetails}\n\n` +
-            `Please arrive 10 minutes before your appointment time.\n` +
-            `If you need to cancel or reschedule, please reply to this email.\n\n`;
+            `Please arrive 10 minutes before your appointment time.\n`;
 
         if (failedSlots.length > 0) {
             confirmationText += `⚠️ Note: ${failedSlots.length} requested slot(s) could not be booked as they were not available.\n\n`;

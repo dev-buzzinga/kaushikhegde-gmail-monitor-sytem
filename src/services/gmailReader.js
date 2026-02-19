@@ -5,9 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from '../config/env.js';
 import { logEmailToCSV } from '../utils/csvLogger.js';
-import { classifyEmail, extractReferralData } from './aiService.js';
+import { classifyEmail, extractReferralData, classifyEmailType } from './aiService.js';
 import { logReferralToCSV } from '../utils/referralLogger.js';
-import { classifyEmailType } from './appointmentClassifier.js';
 import { handleAppointmentEmail } from './appointmentHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -331,8 +330,8 @@ export async function fetchUnseenEmails() {
                 processedEmails.push(emailData);
                 successCount++;
 
-                // Mark as seen (optional - remove if you want emails to stay unseen)
-                // await client.messageFlagsAdd(uid, ['\\Seen']);
+                // Mark as seen so it won't be fetched again
+                await client.messageFlagsAdd(uid, ['\\Seen']);
 
             } catch (emailError) {
                 console.error(`❌ Failed to process email UID ${uid}:`, emailError.message);
