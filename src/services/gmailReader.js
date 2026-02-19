@@ -7,6 +7,8 @@ import { config } from '../config/env.js';
 import { logEmailToCSV } from '../utils/csvLogger.js';
 import { classifyEmail, extractReferralData } from './aiService.js';
 import { logReferralToCSV } from '../utils/referralLogger.js';
+import { classifyEmailType } from './appointmentClassifier.js';
+import { handleAppointmentEmail } from './appointmentHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -128,14 +130,52 @@ async function processEmail(message) {
         // Log to CSV
         await logEmailToCSV(emailData);
 
-        // ✅ AI PROCESSING PIPELINE - Process potential dental referrals
-        await processReferralWithAI(emailData);
+        // ✅ AI PROCESSING PIPELINE - Classify and route email
+        await processEmailWithAI(emailData);
 
         return emailData;
 
     } catch (error) {
         console.error('❌ Error processing email:', error.message);
         throw error;
+    }
+}
+
+/**
+ * AI Processing Dispatcher
+ * Classifies email type and routes to appropriate handler
+ * 
+ * @param {Object} emailData - Processed email data
+ */
+async function processEmailWithAI(emailData) {
+    try {
+        console.log('\n🤖 Starting AI email processing pipeline...');
+
+        // Step 1: Classify email type
+        const emailType = await classifyEmailType(emailData.subject, emailData.body);
+
+        switch (emailType) {
+            case 'REFERRAL':
+                console.log('📋 Routing to referral processing pipeline...');
+                await processReferralWithAI(emailData);
+                break;
+
+            case 'APPOINTMENT':
+                console.log('📅 Routing to appointment processing pipeline...');
+                await handleAppointmentEmail(emailData);
+                break;
+
+            case 'UNKNOWN':
+            default:
+                console.log('⏭️  Email classified as UNKNOWN, routing to referral processing pipeline...');
+                await processReferralWithAI(emailData);
+                break;
+        }
+
+    } catch (error) {
+        // Graceful failure - don't break email processing
+        console.error('⚠️  AI email processing failed (non-critical):', error.message);
+        console.log('📧 Email processing will continue normally\n');
     }
 }
 
@@ -147,7 +187,7 @@ async function processEmail(message) {
  */
 async function processReferralWithAI(emailData) {
     try {
-        console.log('\n🤖 Starting AI referral processing pipeline...');
+        console.log('==> Starting attachment check referral processing pipeline...');
 
         // STEP 1: Check if email has attachments
         if (!emailData.attachments || emailData.attachments.length === 0) {
@@ -181,7 +221,7 @@ async function processReferralWithAI(emailData) {
             console.log('⏭️  Step 4: No referral data extracted (not a referral form or extraction failed)');
             return;
         }
-        console.log('✅ Step 4: Referral data extracted successfully');
+        console.log('✅ Step 4: Referral data extracted successfully---------------------------------------');
 
         // STEP 5: Save to referrals.csv
         await logReferralToCSV({
