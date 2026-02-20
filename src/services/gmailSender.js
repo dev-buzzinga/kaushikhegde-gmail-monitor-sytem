@@ -55,6 +55,9 @@ export async function sendEmail({ to, subject, text, inReplyTo }) {
 
         console.log(`✅ Email sent successfully! Message ID: ${info.messageId}`);
 
+        // Mark the sent email as read in Sent Mail folder via IMAP
+        await markSentEmailAsRead();
+
         return {
             success: true,
             messageId: info.messageId,
@@ -69,5 +72,48 @@ export async function sendEmail({ to, subject, text, inReplyTo }) {
             error: error.message,
             message: 'Failed to send email'
         };
+    }
+}
+
+async function markSentEmailAsRead() {
+    let client;
+
+    try {
+        client = new ImapFlow({
+            host: config.IMAP_HOST,
+            port: config.IMAP_PORT,
+            secure: true,
+            auth: {
+                user: config.EMAIL_USER,
+                pass: config.EMAIL_APP_PASSWORD
+            },
+            logger: false
+        });
+
+        await client.connect();
+
+        // Open the Sent Mail folder
+        await client.mailboxOpen('[Gmail]/Sent Mail');
+
+        // Search for unseen emails in Sent Mail
+        const unseenSent = await client.search({ seen: false });
+
+        if (unseenSent && unseenSent.length > 0) {
+            // Mark all unseen sent emails as read
+            await client.messageFlagsAdd(unseenSent, ['\\Seen']);
+            console.log(`✅ Marked ${unseenSent.length} sent email(s) as read`);
+        }
+
+    } catch (error) {
+        // Non-critical - don't break the flow
+        console.error('⚠️  Could not mark sent email as read:', error.message);
+    } finally {
+        if (client) {
+            try {
+                await client.logout();
+            } catch (logoutError) {
+                // Ignore logout errors
+            }
+        }
     }
 }
